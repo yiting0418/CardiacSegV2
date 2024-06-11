@@ -1,0 +1,20 @@
+{
+    "test": [
+        {
+            "image": "Patient_13/Patient_13_image.nii.gz",
+            "label": "Patient_13/Patient_13_label.nii.gz"
+        }
+    ],
+    "train": [
+        {
+            "image": "Patient_01/Patient_01_image.nii.gz",
+            "label": "Patient_01/Patient_01_label.nii.gz"
+        }
+    ],
+    "val": [
+        {
+            "image": "Patient_10/Patient_10_image.nii.gz",
+            "label": "Patient_10/Patient_10_label.nii.gz"
+        }
+    ]
+}
