@@ -6,11 +6,10 @@ from torchvision.ops.stochastic_depth import StochasticDepth
 
 from timm.models.layers import trunc_normal_
 
-
+from timm.models.layers import DropPath
 from monai.networks.blocks import UnetrBasicBlock, UnetOutBlock
 
 from .blocks.test_block import UnetrUpBlock
-from .blocks.inceptionnext_v2 import InceptionNeXtBlock_V2
 from .blocks.utils import LayerNorm
 from .blocks.cbam import CBAM
 from .blocks.eca import ECA
@@ -18,7 +17,7 @@ from .blocks.conv2former import ConvMod
 from .blocks.cst import WideFocusBlock, ConvAttnWideFocusBlock
 
 
-class TESTNET(nn.Module):
+class BASELINE_RESCBAM(nn.Module):
     def __init__(
             self,
             in_channels=1,
@@ -27,7 +26,7 @@ class TESTNET(nn.Module):
             kernel_size=7,
             exp_rate=4,
             feature_size=48,
-            depths=[3, 3, 9, 3],
+            depths=[2, 2, 2, 2],
             drop_path_rate=0.0, 
             use_init_weights=False,
             is_conv_stem=False,
@@ -48,6 +47,7 @@ class TESTNET(nn.Module):
         
         decoder_norm_name = 'batch' 
         res_block = True
+        # res_block = False
         spatial_dims = 3
         
         self.encoder0 = UnetrBasicBlock(
@@ -155,14 +155,13 @@ class TESTNET(nn.Module):
             self.skip_encoder3 = ConvAttnWideFocusBlock(feature_sizes[2])
             self.skip_encoder4 = ConvAttnWideFocusBlock(feature_sizes[3])
 
-        
         self.bottleneck = nn.Sequential(
-            LayerNorm(feature_sizes[3], eps=1e-6, data_format="channels_first"),
-            nn.Conv3d(feature_sizes[3], feature_sizes[3]*2, kernel_size=2, stride=2),
-            CBAM(feature_sizes[3]*2, reduction=16, kernel_size=7)               
+                    LayerNorm(feature_sizes[3], eps=1e-6, data_format="channels_first"),
+                    nn.Conv3d(feature_sizes[3], feature_sizes[3]*2, kernel_size=2, stride=2),
+                    CBAM(feature_sizes[3]*2, reduction=16, kernel_size=7)
             )
 
-        
+
         self.decoder5 = UnetrUpBlock(
             spatial_dims=spatial_dims,
             in_channels=feature_sizes[3]*2,
@@ -232,16 +231,15 @@ class TESTNET(nn.Module):
         enc1 = hidden_states_out[0]
         enc2 = hidden_states_out[1]
         enc3 = hidden_states_out[2]
-        enc4 = hidden_states_out[3]
+        enc4 = hidden_states_out[3]       
         
         bn = self.bottleneck(enc4)
-
+        
         dec5 = self.decoder5(bn, enc4)
         dec4 = self.decoder4(dec5, enc3)
         dec3 = self.decoder3(dec4, enc2)
         dec2 = self.decoder2(dec3, enc1)
         dec1 = self.decoder1(dec2, enc0)
-        
         
         out = self.out_block(dec1)
         
@@ -309,16 +307,15 @@ class Backbone(nn.Module):
         dp_rates=[x.item() for x in torch.linspace(0, drop_path_rate, sum(depths))] 
         cur = 0
         for i in range(4):
-            stage = nn.Sequential(
-                *[
-                    InceptionNeXtBlock_V2(
-                        dim=feature_sizes[i], 
-                        kernel_size=kernel_size,
-                        exp_rate=exp_rate,
-                        drop_path=dp_rates[cur + j],
-                    )
-                for j in range(depths[i])]
-            )
+            layers=[]
+            for j in range(depths[i]):
+                layers.append(nn.Conv3d(feature_sizes[i], feature_sizes[i], kernel_size=3, padding=1))
+                layers.append(nn.BatchNorm3d(feature_sizes[i]))
+                layers.append(nn.ReLU(inplace=True))
+                # DropPath(drop_path) if drop_path > 0. else nn.Identity()
+                layers.append(nn.Dropout3d(dp_rates[cur + j]))
+                
+            stage = nn.Sequential(*layers)
             self.stages.append(stage)
             cur += depths[i]
         
@@ -341,3 +338,7 @@ class Backbone(nn.Module):
             trunc_normal_(m.weight, std=.02)
             nn.init.constant_(m.bias, 0)
             
+ 
+
+
+

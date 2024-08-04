@@ -9,6 +9,9 @@ from networks.transunet.networks.vit_seg_modeling import VisionTransformer as Vi
 from networks.transunet.networks.vit_seg_modeling import CONFIGS as CONFIGS_ViT_seg
 
 from networks.networkx.unetcnx_a1 import UNETCNX_A1
+from networks.testnet.baseline import BASELINE
+from networks.testnet.baseline_rescbam import BASELINE_RESCBAM
+from networks.testnet.baseline_inceptionnext import BASELINE_INCEPTIONNEXT
 from networks.testnet.testnet import TESTNET
 
 
@@ -188,6 +191,58 @@ def network(model_name, args):
             deep_sup=args.deep_sup,
             first_feature_size_half=args.first_feature_size_half
           ).to(args.device)
+    
+    elif model_name == 'baseline':
+        return BASELINE(
+            in_channels=args.in_channels,
+            out_channels=args.out_channels,
+            patch_size=args.patch_size,
+            kernel_size=args.kernel_size,
+            exp_rate=args.exp_rate,
+            feature_size=args.feature_size,
+            depths=args.depths,
+            drop_path_rate=args.drop_rate,
+            use_init_weights=args.use_init_weights,
+            is_conv_stem=args.is_conv_stem,
+            skip_encoder_name=args.skip_encoder_name,#di, cbam, args.skip_encoder_name
+            deep_sup=args.deep_sup,
+            first_feature_size_half=args.first_feature_size_half
+          ).to(args.device)
+    
+    elif model_name == 'baseline_cbam':
+        return BASELINE_RESCBAM(
+            in_channels=args.in_channels,
+            out_channels=args.out_channels,
+            patch_size=args.patch_size,
+            kernel_size=args.kernel_size,
+            exp_rate=args.exp_rate,
+            feature_size=args.feature_size,
+            depths=args.depths,
+            drop_path_rate=args.drop_rate,
+            use_init_weights=args.use_init_weights,
+            is_conv_stem=args.is_conv_stem,
+            skip_encoder_name=args.skip_encoder_name,#di, cbam, args.skip_encoder_name
+            deep_sup=args.deep_sup,
+            first_feature_size_half=args.first_feature_size_half
+          ).to(args.device)
+    
+    elif model_name == 'baseline_inceptionnext':
+        return BASELINE_INCEPTIONNEXT(
+            in_channels=args.in_channels,
+            out_channels=args.out_channels,
+            patch_size=args.patch_size,
+            kernel_size=args.kernel_size,
+            exp_rate=args.exp_rate,
+            feature_size=args.feature_size,
+            depths=args.depths,
+            drop_path_rate=args.drop_rate,
+            use_init_weights=args.use_init_weights,
+            is_conv_stem=args.is_conv_stem,
+            skip_encoder_name=args.skip_encoder_name,#di, cbam, args.skip_encoder_name
+            deep_sup=args.deep_sup,
+            first_feature_size_half=args.first_feature_size_half
+          ).to(args.device)
+    
     
     else:
         raise ValueError(f'not found model name: {model_name}')
