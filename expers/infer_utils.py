@@ -14,7 +14,7 @@ def get_tune_model_dir(root_exp_dir, exp_name):
 
     print(f"Loading results from {experiment_path}...")
 
-    restored_tuner = tune.Tuner.restore(experiment_path, False)
+    restored_tuner = tune.Tuner.restore(experiment_path, True)
     result_grid = restored_tuner.get_results()
 
     best_result = result_grid.get_best_result(metric="tt_dice", mode="max")
