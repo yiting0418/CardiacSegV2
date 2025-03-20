@@ -4,6 +4,7 @@ from pathlib import PurePath
 
 import pandas as pd
 from ray import tune
+from ray.train.trainer import BaseTrainer
 
 from datasets.chgh_dataset import get_data_dicts
 from data_utils.utils import get_pids_by_data_dicts
@@ -14,7 +15,7 @@ def get_tune_model_dir(root_exp_dir, exp_name):
 
     print(f"Loading results from {experiment_path}...")
 
-    restored_tuner = tune.Tuner.restore(experiment_path, True)
+    restored_tuner = tune.Tuner.restore(experiment_path, BaseTrainer)
     result_grid = restored_tuner.get_results()
 
     best_result = result_grid.get_best_result(metric="tt_dice", mode="max")
