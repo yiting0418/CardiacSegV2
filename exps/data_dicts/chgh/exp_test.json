@@ -2,67 +2,67 @@
     "test": [
         {
             "image": "8_gt.nii.gz",
-            "label": "8.nrrd"
+            "label": "8.nii.gz"
         },
         {
             "image": "9_gt.nii.gz",
-            "label": "9.nrrd"
+            "label": "9.nii.gz"
         },
         {
             "image": "13_gt.nii.gz",
-            "label": "13.nrrd"
+            "label": "13.nii.gz"
         }
     ],
     "train": [
         {
             "image": "14_gt.nii.gz",
-            "label": "14.nrrd"
+            "label": "14.nii.gz"
         },
         {
             "image": "15_gt.nii.gz",
-            "label": "15.nrrd"
+            "label": "15.nii.gz"
         },
         {
             "image": "20_gt.nii.gz",
-            "label": "20.nrrd"
+            "label": "20.nii.gz"
         },
         {
             "image": "27_gt.nii.gz",
-            "label": "27.nrrd"
+            "label": "27.nii.gz"
         },
         {
             "image": "29_gt.nii.gz",
-            "label": "29.nrrd"
+            "label": "29.nii.gz"
         },
         {
             "image": "30_gt.nii.gz",
-            "label": "30.nrrd"
+            "label": "30.nii.gz"
         },
         {
             "image": "100_gt.nii.gz",
-            "label": "100.nrrd"
+            "label": "100.nii.gz"
         },
         {
             "image": "104_gt.nii.gz",
-            "label": "104.nrrd"
+            "label": "104.nii.gz"
         },
         {
             "image": "119_gt.nii.gz",
-            "label": "119.nrrd"
+            "label": "119.nii.gz"
         }
     ],
     "val": [
         {
             "image": "121_gt.nii.gz",
-            "label": "121.nrrd"
+            "label": "121.nii.gz"
         },
         {
             "image": "211_gt.nii.gz",
-            "label": "211.nrrd"
+            "label": "211.nii.gz"
         },
         {
             "image": "218_gt.nii.gz",
-            "label": "218.nrrd"
+            "label": "218.nii.gz"
         }
     ]
 }
