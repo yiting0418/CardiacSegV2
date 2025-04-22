@@ -1,68 +1,68 @@
 {
     "test": [
         {
-            "image": "8_gt.nii.gz",
-            "label": "8.nii.gz"
+            "image": "8.nii.gz",
+            "label": "8_gt.nii.gz"
         },
         {
-            "image": "9_gt.nii.gz",
-            "label": "9.nii.gz"
+            "image": "9.nii.gz",
+            "label": "9_gt.nii.gz"
         },
         {
-            "image": "13_gt.nii.gz",
-            "label": "13.nii.gz"
+            "image": "13.nii.gz",
+            "label": "13_gt.nii.gz"
         }
     ],
     "train": [
         {
-            "image": "14_gt.nii.gz",
-            "label": "14.nii.gz"
+            "image": "14.nii.gz",
+            "label": "14_gt.nii.gz"
         },
         {
-            "image": "15_gt.nii.gz",
-            "label": "15.nii.gz"
+            "image": "15.nii.gz",
+            "label": "15_gt.nii.gz"
         },
         {
-            "image": "20_gt.nii.gz",
-            "label": "20.nii.gz"
+            "image": "20.nii.gz",
+            "label": "20_gt.nii.gz"
         },
         {
-            "image": "27_gt.nii.gz",
-            "label": "27.nii.gz"
+            "image": "27.nii.gz",
+            "label": "27_gt.nii.gz"
         },
         {
-            "image": "29_gt.nii.gz",
-            "label": "29.nii.gz"
+            "image": "29.nii.gz",
+            "label": "29_gt.nii.gz"
         },
         {
-            "image": "30_gt.nii.gz",
-            "label": "30.nii.gz"
+            "image": "30.nii.gz",
+            "label": "30_gt.nii.gz"
         },
         {
-            "image": "100_gt.nii.gz",
-            "label": "100.nii.gz"
+            "image": "100.nii.gz",
+            "label": "100_gt.nii.gz"
         },
         {
-            "image": "104_gt.nii.gz",
-            "label": "104.nii.gz"
+            "image": "104.nii.gz",
+            "label": "104_gt.nii.gz"
         },
         {
-            "image": "119_gt.nii.gz",
-            "label": "119.nii.gz"
+            "image": "119.nii.gz",
+            "label": "119_gt.nii.gz"
         }
     ],
     "val": [
         {
-            "image": "121_gt.nii.gz",
-            "label": "121.nii.gz"
+            "image": "121.nii.gz",
+            "label": "121_gt.nii.gz"
         },
         {
-            "image": "211_gt.nii.gz",
-            "label": "211.nii.gz"
+            "image": "211.nii.gz",
+            "label": "211_gt.nii.gz"
         },
         {
-            "image": "218_gt.nii.gz",
-            "label": "218.nii.gz"
+            "image": "218.nii.gz",
+            "label": "218_gt.nii.gz"
         }
     ]
 }
