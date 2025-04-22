@@ -1,0 +1,68 @@
+{
+    "test": [
+        {
+            "image": "8_gt.nii.gz",
+            "label": "8.nrrd"
+        },
+        {
+            "image": "9_gt.nii.gz",
+            "label": "9.nrrd"
+        },
+        {
+            "image": "13_gt.nii.gz",
+            "label": "13.nrrd"
+        }
+    ],
+    "train": [
+        {
+            "image": "14_gt.nii.gz",
+            "label": "14.nrrd"
+        },
+        {
+            "image": "15_gt.nii.gz",
+            "label": "15.nrrd"
+        },
+        {
+            "image": "20_gt.nii.gz",
+            "label": "20.nrrd"
+        },
+        {
+            "image": "27_gt.nii.gz",
+            "label": "27.nrrd"
+        },
+        {
+            "image": "29_gt.nii.gz",
+            "label": "29.nrrd"
+        },
+        {
+            "image": "30_gt.nii.gz",
+            "label": "30.nrrd"
+        },
+        {
+            "image": "100_gt.nii.gz",
+            "label": "100.nrrd"
+        },
+        {
+            "image": "104_gt.nii.gz",
+            "label": "104.nrrd"
+        },
+        {
+            "image": "119_gt.nii.gz",
+            "label": "119.nrrd"
+        }
+    ],
+    "val": [
+        {
+            "image": "121_gt.nii.gz",
+            "label": "121.nrrd"
+        },
+        {
+            "image": "211_gt.nii.gz",
+            "label": "211.nrrd"
+        },
+        {
+            "image": "218_gt.nii.gz",
+            "label": "218.nrrd"
+        }
+    ]
+}
