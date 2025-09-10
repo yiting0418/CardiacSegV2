@@ -11,7 +11,8 @@ for d in data_names:
 
 # make model dir
 exp_dir = os.path.join('exps', 'exps')
-model_names = ['unetcnx_a1', 'swinunetr', 'unetr', 'cotr', 'attention_unet', 'unet3d']
+#model_names = ['unetcnx_a1', 'swinunetr', 'unetr', 'cotr', 'attention_unet', 'unet3d']
+model_names = ['unet3d']
 for m in model_names:
     for d in data_names:
         # make model dir
