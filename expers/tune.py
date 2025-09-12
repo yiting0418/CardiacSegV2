@@ -292,29 +292,29 @@ def main_worker(args):
         
         # make df
         eval_tt_dice_val_df = pd.DataFrame(
-            tt_dc_vals,
+            [tt_dc_vals],
             columns=[f'tt_dice{n}' for n in label_names]
         )
         eval_tt_hd95_val_df = pd.DataFrame(
-            tt_hd95_vals,
+            [tt_hd95_vals],
             columns=[f'tt_hd95{n}' for n in label_names]
         )
         
         
         eval_inf_dice_val_df = pd.DataFrame(
-            inf_dc_vals,
+            [inf_dc_vals],
             columns=[f'inf_dice{n}' for n in label_names]
         )
         eval_inf_hd95_val_df = pd.DataFrame(
-            inf_hd95_vals,
+            [inf_hd95_vals],
             columns=[f'inf_hd95{n}' for n in label_names]
         )
         eval_inf_sensitivity_val_df = pd.DataFrame(
-            inf_sensitivity_vals,
+            [inf_sensitivity_vals],
             columns=[f'inf_sensitivity{n}' for n in label_names]
         )
         eval_inf_specificity_val_df = pd.DataFrame(
-            inf_specificity_vals,
+            [inf_specificity_vals],
             columns=[f'inf_specificity{n}' for n in label_names]
         )
         
