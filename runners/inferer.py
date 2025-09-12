@@ -95,10 +95,11 @@ def eval_label_pred(data, cls_num, device):
     hd95_vals = hd95_metric.get_buffer().detach().cpu().numpy().squeeze()
     
     confusion_vals = confusion_metric.get_buffer().detach().cpu().numpy().squeeze()
-    tp = confusion_vals[0]
-    fp = confusion_vals[1]
-    tn = confusion_vals[2]
-    fn = confusion_vals[3]
+    print("Confusion_Vals：", confusion_vals)
+    tp = confusion_vals[:, 0]
+    fp = confusion_vals[:, 1]
+    tn = confusion_vals[:, 2]
+    fn = confusion_vals[:, 3]
     sensitivity_vals = tp / (tp + fn)
     specificity_vals = tn / (tn + fp)
     
