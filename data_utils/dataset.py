@@ -55,7 +55,7 @@ def get_infer_loader(keys, args):
 
 def get_label_names(data_name):
     label_names_map = {
-        'chgh': ['C'],
+        'chgh': ['C', 'AO', 'CA'],
         'mmwhs': ['LV', 'RV', 'LA', 'RA', 'MLV', 'AA', 'PA'],
         'hvsmr': ['M', 'B'],
         'segthor': ['C'],
