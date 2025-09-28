@@ -262,11 +262,11 @@ def main_worker(args):
         # run infer
         pids = get_pids_by_data_dicts(test_dicts)
         inf_dc_vals = []
-        inf_hd95_vals = []
+        inf_iou_vals = []
         inf_sensitivity_vals = []
         inf_specificity_vals = []
         tt_dc_vals = []
-        tt_hd95_vals = []
+        tt_iou_vals = []
         inf_times = []
         for data_dict in test_dicts:
             print('infer data:', data_dict)
@@ -281,9 +281,9 @@ def main_worker(args):
                 args
             )
             tt_dc_vals.append(ret_dict['tta_dc'])
-            tt_hd95_vals.append(ret_dict['tta_hd'])
+            tt_iou_vals.append(ret_dict['tta_iou'])
             inf_dc_vals.append(ret_dict['ori_dc'])
-            inf_hd95_vals.append(ret_dict['ori_hd'])
+            inf_iou_vals.append(ret_dict['ori_iou'])
             inf_sensitivity_vals.append(ret_dict['ori_sensitivity'])
             inf_specificity_vals.append(ret_dict['ori_specificity'])
             inf_times.append(ret_dict['inf_time'])
@@ -295,9 +295,9 @@ def main_worker(args):
             tt_dc_vals,
             columns=[f'tt_dice{n}' for n in label_names]
         )
-        eval_tt_hd95_val_df = pd.DataFrame(
-            tt_hd95_vals,
-            columns=[f'tt_hd95{n}' for n in label_names]
+        eval_tt_iou_val_df = pd.DataFrame(
+            tt_iou_vals,
+            columns=[f'tt_iou{n}' for n in label_names]
         )
         
         
@@ -305,9 +305,9 @@ def main_worker(args):
             inf_dc_vals,
             columns=[f'inf_dice{n}' for n in label_names]
         )
-        eval_inf_hd95_val_df = pd.DataFrame(
-            inf_hd95_vals,
-            columns=[f'inf_hd95{n}' for n in label_names]
+        eval_inf_iou_val_df = pd.DataFrame(
+            inf_iou_vals,
+            columns=[f'inf_iou{n}' for n in label_names]
         )
         eval_inf_sensitivity_val_df = pd.DataFrame(
             inf_sensitivity_vals,
@@ -329,16 +329,16 @@ def main_worker(args):
         })
         
         avg_tt_dice = eval_tt_dice_val_df.T.mean().mean()
-        avg_tt_hd95 =  eval_tt_hd95_val_df.T.mean().mean()
+        avg_tt_iou =  eval_tt_iou_val_df.T.mean().mean()
         avg_inf_dice = eval_inf_dice_val_df.T.mean().mean()
-        avg_inf_hd95 =  eval_inf_hd95_val_df.T.mean().mean()
+        avg_inf_iou =  eval_inf_iou_val_df.T.mean().mean()
         avg_inf_sensitivity =  eval_inf_sensitivity_val_df.T.mean().mean()
         avg_inf_specificity =  eval_inf_specificity_val_df.T.mean().mean()
         avg_inf_time = eval_inf_time_df.T.mean().mean()
 
         eval_df = pd.concat([
-            pid_df, eval_tt_dice_val_df, eval_tt_hd95_val_df,
-            eval_inf_dice_val_df, eval_inf_hd95_val_df,
+            pid_df, eval_tt_dice_val_df, eval_tt_iou_val_df,
+            eval_inf_dice_val_df, eval_inf_iou_val_df,
             eval_inf_sensitivity_val_df, eval_inf_specificity_val_df,eval_inf_time_df
         ], axis=1, join='inner').reset_index(drop=True)
         
@@ -347,9 +347,9 @@ def main_worker(args):
         
         print("\neval result:")
         print('avg tt dice:', avg_tt_dice)
-        print('avg tt hd95:', avg_tt_hd95)
+        print('avg tt iou:', avg_tt_iou)
         print('avg inf dice:', avg_inf_dice)
-        print('avg inf hd95:', avg_inf_hd95)
+        print('avg inf iou:', avg_inf_iou)
         print('avg inf sensitivity:', avg_inf_sensitivity)
         print('avg inf specificity:', avg_inf_specificity)
         print('avg inf time:', avg_inf_time)
@@ -358,9 +358,9 @@ def main_worker(args):
         
         tune.report(
             tt_dice=avg_tt_dice,
-            tt_hd95=avg_tt_hd95,
+            tt_iou=avg_tt_iou,
             inf_dice=avg_inf_dice,
-            inf_hd95=avg_inf_hd95,
+            inf_iou=avg_inf_iou,
             val_bst_acc=best_acc,
             inf_time=avg_inf_time
         )
@@ -459,9 +459,9 @@ if __name__ == "__main__":
     trainable_with_cpu_gpu = tune.with_resources(partial(main, args=args), {"cpu": 1, "gpu": 1})
     reporter = CLIReporter(metric_columns=[
         'tt_dice',
-        'tt_hd95',
+        'tt_iou',
         'inf_dice',
-        'inf_hd95',
+        'inf_iou',
         'val_bst_acc',
         'esc',
         'inf_time',

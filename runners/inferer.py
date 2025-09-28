@@ -20,7 +20,7 @@ from monai.transforms import (
     Spacing,
     SqueezeDim
 )
-from monai.metrics import DiceMetric, HausdorffDistanceMetric, ConfusionMatrixMetric,get_confusion_matrix, compute_confusion_matrix_metric
+from monai.metrics import DiceMetric, MeanIoU, ConfusionMatrixMetric,get_confusion_matrix, compute_confusion_matrix_metric
 
 from data_utils.io import save_img
 import matplotlib.pyplot as plt
@@ -56,13 +56,8 @@ def eval_label_pred(data, cls_num, device):
         reduction="mean",
         get_not_nans=False
     )
-    
-    hd95_metric = HausdorffDistanceMetric(
-        include_background=False,
-        percentile=95,
-        reduction="mean",
-        get_not_nans=False
-    )
+
+    iou_metric = MeanIoU(include_background=False)
     
     confusion_metric = ConfusionMatrixMetric(
         include_background=False, 
@@ -88,11 +83,11 @@ def eval_label_pred(data, cls_num, device):
     ]
     
     dice_metric(y_pred=val_output_convert, y=val_labels_convert)
-    hd95_metric(y_pred=val_output_convert, y=val_labels_convert)
+    iou_metric(y_pred=val_output_convert, y=val_labels_convert)
     confusion_metric(y_pred=val_output_convert, y=val_labels_convert)
 
     dc_vals = dice_metric.get_buffer().detach().cpu().numpy().squeeze()
-    hd95_vals = hd95_metric.get_buffer().detach().cpu().numpy().squeeze()
+    iou_vals = iou_metric.get_buffer().detach().cpu().numpy().squeeze()
     
     confusion_vals = confusion_metric.get_buffer().detach().cpu().numpy().squeeze()
     print("Confusion_Vals：", confusion_vals)
@@ -104,7 +99,7 @@ def eval_label_pred(data, cls_num, device):
     specificity_vals = tn / (tn + fp)
     
     
-    return dc_vals, hd95_vals, sensitivity_vals, specificity_vals
+    return dc_vals, iou_vals, sensitivity_vals, specificity_vals
 
 
 def get_filename(data):
@@ -142,12 +137,12 @@ def run_infering(
     
     # eval infer tta
     if 'label' in data.keys():
-        tta_dc_vals, tta_hd95_vals, _ , _ = eval_label_pred(data, args.out_channels, args.device)
+        tta_dc_vals, tta_iou_vals, _ , _ = eval_label_pred(data, args.out_channels, args.device)
         print('infer test time aug:')
         print('dice:', tta_dc_vals)
-        print('hd95:', tta_hd95_vals)
+        print('iou:', tta_iou_vals)
         ret_dict['tta_dc'] = tta_dc_vals
-        ret_dict['tta_hd'] = tta_hd95_vals
+        ret_dict['tta_iou'] = tta_iou_vals
         
         # post label transform 
         sqz_transform = SqueezeDimd(keys=['label'])
@@ -166,14 +161,14 @@ def run_infering(
         data['label'] = lbl_data['label']
         data['label_meta_dict'] = lbl_data['label']
         
-        ori_dc_vals, ori_hd95_vals, ori_sensitivity_vals, ori_specificity_vals = eval_label_pred(data, args.out_channels, args.device)
+        ori_dc_vals, ori_iou_vals, ori_sensitivity_vals, ori_specificity_vals = eval_label_pred(data, args.out_channels, args.device)
         print('infer test original:')
         print('dice:', ori_dc_vals)
-        print('hd95:', ori_hd95_vals)
+        print('iou:', ori_iou_vals)
         print('sensitivity:', ori_sensitivity_vals)
         print('specificity:', ori_specificity_vals)
         ret_dict['ori_dc'] = ori_dc_vals
-        ret_dict['ori_hd'] = ori_hd95_vals
+        ret_dict['ori_iou'] = ori_iou_vals
         ret_dict['ori_sensitivity'] = ori_sensitivity_vals
         ret_dict['ori_specificity'] = ori_specificity_vals
     

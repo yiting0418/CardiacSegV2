@@ -23,7 +23,7 @@ def get_tune_model_dir(root_exp_dir, exp_name):
     print(f"\nBest trial {best_result.metrics['trial_id']}: ")
     print('config:', best_result.metrics['config'])
     print('tt_dice:', best_result.metrics['tt_dice'])
-    print('tt_hd95:', best_result.metrics['tt_hd95'])
+    print('tt_iou:', best_result.metrics['tt_iou'])
     if 'esc' in best_result.metrics:
         print('esc:', best_result.metrics['esc'])
     print(f'best log dir:', best_result.log_dir)
@@ -78,12 +78,12 @@ def get_eval_val(csv_pth, pid):
     if 'inf_diceLV' in df[idx]:
         return {
             'dice': df[idx].filter(regex=("inf_dice*")).T.mean().tolist()[0],
-            'hd95': df[idx].filter(regex=("inf_hd*")).T.mean().tolist()[0]
+            'iou': df[idx].filter(regex=("inf_iou*")).T.mean().tolist()[0]
         }
     else:
         return {
             'dice': df[idx]['inf_diceC'].tolist()[0],
-            'hd95': df[idx]['inf_hd95C'].tolist()[0]
+            'iou': df[idx]['inf_iouC'].tolist()[0]
         }
 
 

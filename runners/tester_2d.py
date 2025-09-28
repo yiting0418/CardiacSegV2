@@ -1,5 +1,5 @@
 from monai.data import decollate_batch
-from monai.metrics import DiceMetric, HausdorffDistanceMetric
+from monai.metrics import DiceMetric, MeanIoU
 import torch
 from tqdm import tqdm
 
@@ -10,12 +10,9 @@ def eval(data_loader, model, model_inferer, post_label, post_pred):
         reduction="mean",
         get_not_nans=False
     )
-    hd95_metric = HausdorffDistanceMetric(
-        include_background=False,
-        percentile=95,
-        reduction="mean",
-        get_not_nans=False
-    )
+    
+    iou_metric = MeanIoU(include_background=False)
+
     it = tqdm(data_loader, dynamic_ncols=True)
     steps = len(it)
     model.eval()
@@ -32,11 +29,11 @@ def eval(data_loader, model, model_inferer, post_label, post_pred):
                 post_pred(val_pred_tensor) for val_pred_tensor in val_outputs_list
             ]
             dice_metric(y_pred=val_output_convert, y=val_labels_convert)
-            hd95_metric(y_pred=val_output_convert, y=val_labels_convert)
+            iou_metric(y_pred=val_output_convert, y=val_labels_convert)
             it.set_description(f"eval ({step} / {steps} Steps)")
     dc_vals = dice_metric.get_buffer().detach().cpu().numpy().squeeze()
-    hd95_vals = hd95_metric.get_buffer().detach().cpu().numpy().squeeze()
-    return dc_vals, hd95_vals
+    iou_vals = iou_metric.get_buffer().detach().cpu().numpy().squeeze()
+    return dc_vals, iou_vals
 
 
 def run_testing(

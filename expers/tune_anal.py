@@ -43,10 +43,10 @@ best_result = result_grid.get_best_result(metric="inf_dice", mode="max")
 print( f"\nBest trial {best_result.metrics['trial_id']}: ")
 print('config:', best_result.metrics['config'])
 print('tt_dice:', best_result.metrics['tt_dice'])
-print('tt_hd95:', best_result.metrics['tt_hd95'])
+print('tt_iou:', best_result.metrics['tt_iou'])
 if 'inf_dice' in best_result.metrics:
     print('inf_dice:', best_result.metrics['inf_dice'])
-    print('inf_hd95:', best_result.metrics['inf_hd95'])
+    print('inf_iou:', best_result.metrics['inf_iou'])
 print(f'best log dir:', best_result.log_dir)
 
 

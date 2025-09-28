@@ -159,9 +159,9 @@ def main_worker(args):
         # run infer
         pids = get_pids_by_data_dicts(test_dicts)
         inf_dc_vals = []
-        inf_hd95_vals = []
+        inf_iou_vals = []
         tt_dc_vals = []
-        tt_hd95_vals = []
+        tt_iou_vals = []
         for data_dict in test_dicts:
             print('infer data:', data_dict)
             # load infer data
@@ -175,9 +175,9 @@ def main_worker(args):
                 args
             )
             tt_dc_vals.append(ret_dict['tta_dc'])
-            tt_hd95_vals.append(ret_dict['tta_hd'])
+            tt_iou_vals.append(ret_dict['tta_iou'])
             inf_dc_vals.append(ret_dict['ori_dc'])
-            inf_hd95_vals.append(ret_dict['ori_hd'])
+            inf_iou_vals.append(ret_dict['ori_iou'])
             
         
         # make df
@@ -185,9 +185,9 @@ def main_worker(args):
             tt_dc_vals,
             columns=[f'tt_dice{n}' for n in label_names]
         )
-        eval_tt_hd95_val_df = pd.DataFrame(
-            tt_hd95_vals,
-            columns=[f'tt_hd95{n}' for n in label_names]
+        eval_tt_iou_val_df = pd.DataFrame(
+            tt_iou_vals,
+            columns=[f'tt_iou{n}' for n in label_names]
         )
         
         
@@ -195,9 +195,9 @@ def main_worker(args):
             inf_dc_vals,
             columns=[f'inf_dice{n}' for n in label_names]
         )
-        eval_inf_hd95_val_df = pd.DataFrame(
-            inf_hd95_vals,
-            columns=[f'inf_hd95{n}' for n in label_names]
+        eval_inf_iou_val_df = pd.DataFrame(
+            inf_iou_vals,
+            columns=[f'inf_iou{n}' for n in label_names]
         )
         
         pid_df = pd.DataFrame({
@@ -205,13 +205,13 @@ def main_worker(args):
         })
         
         avg_tt_dice = eval_tt_dice_val_df.T.mean().mean()
-        avg_tt_hd95 =  eval_tt_hd95_val_df.T.mean().mean()
+        avg_tt_iou =  eval_tt_iou_val_df.T.mean().mean()
         avg_inf_dice = eval_inf_dice_val_df.T.mean().mean()
-        avg_inf_hd95 =  eval_inf_hd95_val_df.T.mean().mean()
+        avg_inf_iou =  eval_inf_iou_val_df.T.mean().mean()
 
         eval_df = pd.concat([
-            pid_df, eval_tt_dice_val_df, eval_tt_hd95_val_df,
-            eval_inf_dice_val_df, eval_inf_hd95_val_df,
+            pid_df, eval_tt_dice_val_df, eval_tt_iou_val_df,
+            eval_inf_dice_val_df, eval_inf_iou_val_df,
         ], axis=1, join='inner').reset_index(drop=True)
         
 
@@ -219,9 +219,9 @@ def main_worker(args):
         
         print("\neval result:")
         print('avg tt dice:', avg_tt_dice)
-        print('avg tt hd95:', avg_tt_hd95)
+        print('avg tt iou:', avg_tt_iou)
         print('avg inf dice:', avg_inf_dice)
-        print('avg inf hd95:', avg_inf_hd95)
+        print('avg inf iou:', avg_inf_iou)
         print(eval_df.to_string())
 
 

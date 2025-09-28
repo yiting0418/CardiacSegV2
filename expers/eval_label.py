@@ -47,7 +47,7 @@ def main_worker(args):
         data = get_infer_data(data_dict, args)
 
         # eval
-        dc_vals, hd95_vals = eval_label_pred(
+        dc_vals, iou_vals = eval_label_pred(
             data,
             args.out_channels,
             args.device
@@ -55,7 +55,7 @@ def main_worker(args):
         
         print('pred name:',  PurePath(data_dict['pred']).parts[-1].split('_')[-1].split('.')[0])
         print('dice:', dc_vals)
-        print('hd95:', hd95_vals)
+        print('iou:', iou_vals)
         print()
 
 
