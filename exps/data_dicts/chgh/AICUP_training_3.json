@@ -1,0 +1,20 @@
+{
+    "test": [
+        {
+            "image": "patient0001.nii.gz",
+            "label": "patient0001_gt.nii.gz"
+        }
+    ],
+    "train": [
+        {
+            "image": "patient0002.nii.gz",
+            "label": "patient0002_gt.nii.gz"
+        }
+    ],
+    "val": [
+        {
+            "image": "patient0003.nii.gz",
+            "label": "patient0003_gt.nii.gz"
+        }
+    ]
+}
