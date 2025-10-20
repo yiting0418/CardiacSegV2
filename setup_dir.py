@@ -2,7 +2,7 @@ import os
 
 # make dataset dir
 root_data_dir = 'dataset'
-data_names = ['chgh', 'mmwhs']
+data_names = ['chgh']
 for d in data_names:
     data_dir = os.path.join(root_data_dir, d)
     os.makedirs("./CardiacSeg/" + data_dir, exist_ok=True)
