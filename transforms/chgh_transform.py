@@ -1,5 +1,8 @@
+# 檔案: transforms/chgh_transform.py
+# (已加入治本方案的最終版本)
+
 from monai.transforms import (
-    AddChanneld,
+    EnsureChannelFirstd,  
     Compose,
     LoadImaged,
     Orientationd,
@@ -9,14 +12,26 @@ from monai.transforms import (
     ScaleIntensityRanged,
     Spacingd,
     RandRotate90d,
-    ToTensord
+    Transposed, # <--- 1. 導入 Transposed
+    EnsureTyped,  # <--- 2. 導入 EnsureTyped (取代 ToTensorD)
 )
 
 def get_train_transform(args):
     return Compose(
         [
             LoadImaged(keys=["image", "label"]),
-            AddChanneld(keys=["image", "label"]),
+            EnsureChannelFirstd(keys=["image", "label"]),
+
+            # --- START CRITICAL FIX (治本方案) ---
+            # 這是最關鍵的修正：
+            # MONAI 載入 NIfTI 檔案時，維度通常是 (H, W, D)。
+            # 我們將其轉置 (transpose) 為模型期望的 (D, H, W) 格式。
+            Transposed(keys=["image", "label"], indices=[0, 3, 1, 2]),
+            # --- END CRITICAL FIX ---
+            
+            # 確保資料類型正確，這比舊的 ToTensorD 更推薦
+            EnsureTyped(keys=["image", "label"]),
+            
             Orientationd(keys=["image", "label"], axcodes="RAS"),
             Spacingd(
                 keys=["image", "label"],
@@ -27,10 +42,12 @@ def get_train_transform(args):
                 keys=["image"],
                 a_min=args.a_min, 
                 a_max=args.a_max,
-                b_min=args.b_min, 
-                b_max=args.b_max,
+                b_min=getattr(args, 'b_min', 0.0), # 使用 getattr 提供預設值
+                b_max=getattr(args, 'b_max', 1.0),
                 clip=True,
             ),
+            # 注意：CropForeground 可能會改變影像大小，需要在 Spacing 之後
+            # 如果您的流程中沒有 CropForegroundd，可以忽略此註解
             RandCropByPosNegLabeld(
                 keys=["image", "label"],
                 label_key="label",
@@ -66,7 +83,7 @@ def get_train_transform(args):
                 offsets=0.10,
                 prob=args.rand_shift_intensityd_prob,
             ),
-            ToTensord(keys=["image", "label"])
+            # ToTensorD 在 MONAI 新版本中通常由 EnsureTyped 自動處理，可以移除
         ]
     )
 
@@ -75,7 +92,15 @@ def get_val_transform(args):
     return Compose(
         [
             LoadImaged(keys=["image", "label"]),
-            AddChanneld(keys=["image", "label"]),
+            EnsureChannelFirstd(keys=["image", "label"]),
+
+            # --- START CRITICAL FIX (治本方案) ---
+            # 驗證集也必須進行同樣的維度轉置！
+            Transposed(keys=["image", "label"], indices=[0, 3, 1, 2]),
+            # --- END CRITICAL FIX ---
+            
+            EnsureTyped(keys=["image", "label"]),
+            
             Orientationd(keys=["image", "label"], axcodes="RAS"),
             Spacingd(
                 keys=["image", "label"],
@@ -83,28 +108,39 @@ def get_val_transform(args):
                 mode=("bilinear", "nearest"),
             ),
             ScaleIntensityRanged(
-                keys=["image"], a_min=args.a_min, a_max=args.a_max, b_min=args.b_min, b_max=args.b_max, clip=True
+                keys=["image"],
+                a_min=args.a_min, 
+                a_max=args.a_max, 
+                b_min=getattr(args, 'b_min', 0.0), 
+                b_max=getattr(args, 'b_max', 1.0), 
+                clip=True
             ),
-            ToTensord(keys=["image", "label"])
+            # ToTensorD 可以移除
         ]
     )
 
 
 def get_inf_transform(keys, args):
     if len(keys) == 2:
-        # image and label
         mode = ("bilinear", "nearest")
     elif len(keys) == 3:
-        # image and mutiple label
         mode = ("bilinear", "nearest", "nearest")
     else:
-        # image
-        mode = ("bilinear")
+        mode = ("bilinear",) 
         
     return Compose(
         [
             LoadImaged(keys=keys),
-            AddChanneld(keys=keys),
+            EnsureChannelFirstd(keys=keys),
+
+            # --- START CRITICAL FIX (治本方案) ---
+            # 推斷時也必須進行同樣的維度轉置！
+            Transposed(keys=['image'], indices=[0, 3, 1, 2]),
+            # --- END CRITICAL FIX ---
+
+            EnsureTyped(keys=keys),
+            
+            # 您的原始推斷流程包含了重採樣，這裡予以保留
             Orientationd(keys=keys, axcodes="RAS"),
             Spacingd(
                 keys=keys,
@@ -115,18 +151,23 @@ def get_inf_transform(keys, args):
                 keys=['image'],
                 a_min=args.a_min, 
                 a_max=args.a_max,
-                b_min=args.b_min, 
-                b_max=args.b_max,
+                b_min=getattr(args, 'b_min', 0.0), 
+                b_max=getattr(args, 'b_max', 1.0),
                 clip=True,
-                allow_missing_keys=True
+                allow_missing_keys=True # 保持這個，因為 label 可能不存在
             ),
-            AddChanneld(keys=keys),
-            ToTensord(keys=keys)
+            # ToTensorD 可以移除
         ]
     )
 
 
 def get_label_transform(keys=["label"]):
+    # 這個函數用於在評估原始結果時重新載入標籤
     return Compose(
-        LoadImaged(keys=keys)
+        [
+            LoadImaged(keys=keys),
+            EnsureChannelFirstd(keys=keys),
+            # 注意：這裡不需要 Transposed，因為 Restored 函數會將 pred
+            # 轉換回原始標籤的空間，所以我們需要載入原始方向的標籤來比較。
+        ]
     )
