@@ -1,6 +1,6 @@
 import sys
 # set package path
-sys.path.append("/nfs/Workspace/CardiacSegV2")
+sys.path.append("/content/CardiacSegV2")
 
 import os
 from functools import partial
@@ -35,7 +35,17 @@ from networks.network import network
 from optimizers.optimizer import Optimizer, LR_Scheduler
 
 
+# Initialize Ray (only if not already running)
+if not ray.is_initialized():
+    ray.init(runtime_env={"working_dir": "/content/CardiacSegV2"})
+
 def main(config, args=None):
+    """
+    Ray Tune trial function. 
+    This function handles config mapping and runs the training phase.
+    It relies on run_training to report validation metrics to Ray Tune.
+    """
+    # 1. Map hyperparameters from Ray Tune's config dictionary back into args object
     if args.tune_mode == 'transform':
         args = map_args_transform(config, args)
     elif args.tune_mode == 'optim':
@@ -47,7 +57,7 @@ def main(config, args=None):
     elif args.tune_mode == 'network':
         args = map_args_network(config, args)
     else:
-        # for LinearWarmupCosineAnnealingLR
+        # For non-tune modes or default settings, print parameters
         args.max_epochs = args.max_epoch
         print('a_max', args.a_max)
         print('a_min', args.a_min)
@@ -59,22 +69,45 @@ def main(config, args=None):
         print('max_epochs',args.max_epochs)
     
     
-    # train
+    # 2. Run Training/Validation phase for the trial
+    # NOTE: We only run the TRAIN phase here. The final TEST/EVAL phase 
+    # should be executed once on the best model outside of the tuning loop 
+    # in the `if args.tune_mode == 'test'` block in __main__.
+    
+    # Set train mode and checkpoint path for continuation/saving within the trial
     args.test_mode = False
     args.checkpoint = os.path.join(args.model_dir, 'final_model.pth')
+    
+    # Start the training process
     main_worker(args)
-    # test
-    args.test_mode = True
-    args.checkpoint = os.path.join(args.model_dir, 'best_model.pth')
-    args.ssl_checkpoint = None
-    main_worker(args)
+    # The training process (run_training) should report validation metrics 
+    # to Ray Tune via `tune.report` internally.
     
 
-
 def main_worker(args):
+    import monai.utils
+    import numpy as np
+    import torch
+    """
+    The core worker function for training, validation, or final testing.
+    """
+    # --- START FIX: Set deterministic seed ---
+    # 解決 monai.transforms.Compose 中的 OverflowError
+    # 確保在初始化任何 transform 之前設定一個有效的種子
+    seed = getattr(args, 'seed', 42)    # 如果 args.seed 存在則使用它，否則使用 42
+    monai.utils.set_determinism(seed=seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed_all(seed)
+    # --- END FIX ---
+
     # # make dir
     os.makedirs(args.model_dir, exist_ok=True)
     os.makedirs(args.log_dir, exist_ok=True)
+    if args.test_mode:
+        os.makedirs(args.eval_dir, exist_ok=True)
+
 
     # device
     if torch.cuda.is_available():
@@ -100,82 +133,75 @@ def main_worker(args):
     else:
         print('loss: dice ce loss')
         dice_loss = DiceCELoss(to_onehot_y=True, softmax=True)
-        # print('loss: dice loss')
-        # dice_loss = DiceLoss(to_onehot_y=True, softmax=True)
-        # print('loss: dice focal loss')
-        # dice_loss = DiceFocalLoss(
-        #     to_onehot_y=True, 
-        #     softmax=True,
-        #     gamma=2.0,
-        #     lambda_dice=args.lambda_dice,
-        #     lambda_focal=args.lambda_focal
-        # )
+        # 由於原始程式碼中有多行註釋的 Dice Loss/Dice Focal Loss，我將其移除以提高程式碼清晰度。
     
     # optimizer
     print(f'optimzer: {args.optim}')
     optimizer = Optimizer(args.optim, model.parameters(), args)
 
     # lrschedule
+    scheduler = None
     if args.lrschedule is not None:
         print(f'lrschedule: {args.lrschedule}')
         scheduler = LR_Scheduler(args.lrschedule, optimizer, args)
-    else:
-        scheduler = None
 
-    # check point
+    # check point & loading logic
     start_epoch = args.start_epoch
     early_stop_count = args.early_stop_count
     best_acc = 0
     if args.checkpoint is not None and os.path.exists(args.checkpoint):
         checkpoint = torch.load(args.checkpoint, map_location="cpu")
         # load model
-        model.load_state_dict(checkpoint["state_dict"])
-        # load optimizer
-        optimizer.load_state_dict(checkpoint['optimizer'])
-        # load lrschedule
-        if args.lrschedule is not None and 'scheduler' in checkpoint:
-            scheduler.load_state_dict(checkpoint['scheduler'])
-        # load check point epoch and best acc
-        if "epoch" in checkpoint:
-            start_epoch = checkpoint["epoch"] + 1
-        if "best_acc" in checkpoint:
-            best_acc = checkpoint["best_acc"]
-        if "early_stop_count" in checkpoint:
-            early_stop_count = checkpoint["early_stop_count"]
+        model.load_state_dict(checkpoint["state_dict"], strict=True) # 使用 strict=True 確保模型結構匹配
+        # load optimizer and scheduler only if training is ongoing
+        if not args.test_mode:
+            optimizer.load_state_dict(checkpoint['optimizer'])
+            if args.lrschedule is not None and 'scheduler' in checkpoint:
+                scheduler.load_state_dict(checkpoint['scheduler'])
+            
+            # load check point epoch and best acc
+            if "epoch" in checkpoint:
+                start_epoch = checkpoint["epoch"] + 1
+            if "best_acc" in checkpoint:
+                best_acc = checkpoint["best_acc"]
+            if "early_stop_count" in checkpoint:
+                early_stop_count = checkpoint["early_stop_count"]
+                
         print(
-          "=> loaded checkpoint '{}' (epoch {}) (bestacc {}) (early stop count {})"\
-          .format(args.checkpoint, start_epoch, best_acc, early_stop_count)
+            "==> Loaded checkpoint '{}' (epoch {}) (bestacc {}) (early stop count {})"\
+            .format(args.checkpoint, start_epoch, best_acc, early_stop_count)
         )
     else:
-        # ssl pretrain
+        # ssl pretrain logic
         if args.model_name =='swinunetr' and args.ssl_checkpoint and os.path.exists(args.ssl_checkpoint):
             pre_train_path = os.path.join(args.ssl_checkpoint)
             weight = torch.load(pre_train_path)
-           
-            if "net" in list(weight["state_dict"].keys())[0]:
+            
+            # Key mapping logic for Swin UNETR SSL pre-training weights
+            state_dict = weight.get("state_dict", weight) # Handle case where state_dict is not nested
+            
+            if "net" in list(state_dict.keys())[0]:
                 print("Tag 'net' found in state dict - fixing!")
-                for key in list(weight["state_dict"].keys()):
+                for key in list(state_dict.keys()):
+                    new_key = key
                     if 'swinViT' in key:
                         new_key = key.replace("net.swinViT", "module")
-                        weight["state_dict"][new_key] = weight["state_dict"].pop(key) 
                     else:
                         new_key = key.replace("net", "module")
-                        weight["state_dict"][new_key] = weight["state_dict"].pop(key)
+                    
+                    if 'linear' in new_key:
+                        new_key = new_key.replace("linear", "fc")
+                    
+                    state_dict[new_key] = state_dict.pop(key) 
 
-                    if 'linear' in  new_key:
-                        weight["state_dict"][new_key.replace("linear", "fc")] = weight["state_dict"].pop(new_key)
+            model.load_from(weights=state_dict)
+            print(f"==> Using pretrained self-supervied {args.model_name} backbone weights from '{args.ssl_checkpoint}'")
             
-            model.load_from(weights=weight)
-            print("Using pretrained self-supervied Swin UNETR backbone weights !")
-            print(
-              "=> loaded pretrain checkpoint '{}'"\
-              .format(args.ssl_checkpoint)
-            )
         elif args.ssl_checkpoint and os.path.exists(args.ssl_checkpoint):
+            # General SSL pretrain logic
             model_dict = torch.load(args.ssl_checkpoint)
             state_dict = model_dict["state_dict"]
-            # fix potential differences in state dict keys from pre-training to
-            # fine-tuning
+            # fix potential differences in state dict keys from pre-training to fine-tuning
             if "module." in list(state_dict.keys())[0]:
                 print("Tag 'module.' found in state dict - fixing!")
                 for key in list(state_dict.keys()):
@@ -188,23 +214,23 @@ def main_worker(args):
                 print("Tag 'net' found in state dict - fixing!")
                 for key in list(state_dict.keys()):
                     state_dict[key.replace("net.", "")] = state_dict.pop(key)
-            # We now load model weights, setting param `strict` to False, i.e.:
-            # this load the encoder weights (Swin-ViT, SSL pre-trained), but leaves
-            # the decoder weights untouched (CNN UNet decoder).
+
+            # Load weights, allowing non-strict loading to ignore decoder layers
             model.load_state_dict(state_dict, strict=False)
-            print(f"Using pretrained self-supervied {args.model_name} backbone weights !")
-            print(
-              "=> loaded pretrain checkpoint '{}'"\
-              .format(args.ssl_checkpoint)
-            )
+            print(f"==> Using pretrained self-supervied {args.model_name} backbone weights from '{args.ssl_checkpoint}' (strict=False)")
             
-    # inferer
+    # inferer setup
     post_label = AsDiscrete(to_onehot=args.out_channels)
     post_pred = AsDiscrete(argmax=True, to_onehot=args.out_channels)
     dice_acc = DiceMetric(include_background=True, reduction="mean", get_not_nans=False)
+    
+    # Use individual args.roi_x, y, z, which should contain the values from the best trial's config 
+    # (crucial for inference consistency with trained model)
+    roi_size = [args.roi_x, args.roi_y, args.roi_z]
+        
     model_inferer = partial(
         sliding_window_inference,
-        roi_size=[args.roi_x, args.roi_y, args.roi_z],
+        roi_size=roi_size,
         sw_batch_size=args.sw_batch_size,
         predictor=model,
         overlap=args.infer_overlap,
@@ -214,9 +240,9 @@ def main_worker(args):
     writer = SummaryWriter(log_dir=args.log_dir)
 
     if not args.test_mode:
+        # --- Training Mode ---
         # load train and test data
         loader = DataLoader(args.data_name, args)()
-        
         tr_loader, val_loader = loader
         
         # training
@@ -239,8 +265,8 @@ def main_worker(args):
         )
     
     else:
-        os.makedirs(args.eval_dir, exist_ok=True)
-        
+        # --- Test/Inference Mode (Final Evaluation) ---
+        print("Starting final test/inference mode...")
         
         label_names = get_label_names(args.data_name)
         
@@ -258,7 +284,7 @@ def main_worker(args):
             ToNumpyd(keys=keys),
             Restored(keys=keys, ref_image="image")
         ])
-       
+        
         # run infer
         pids = get_pids_by_data_dicts(test_dicts)
         inf_dc_vals = []
@@ -268,6 +294,11 @@ def main_worker(args):
         tt_dc_vals = []
         tt_iou_vals = []
         inf_times = []
+        
+        # Ensure model is in evaluation mode and on the correct device
+        model.to(args.device)
+        model.eval()
+        
         for data_dict in test_dicts:
             print('infer data:', data_dict)
             # load infer data
@@ -288,7 +319,8 @@ def main_worker(args):
             inf_specificity_vals.append(ret_dict['ori_specificity'])
             inf_times.append(ret_dict['inf_time'])
             
-
+        
+        
         
         # make df
         eval_tt_dice_val_df = pd.DataFrame(
@@ -329,13 +361,15 @@ def main_worker(args):
         })
         
         avg_tt_dice = eval_tt_dice_val_df.T.mean().mean()
-        avg_tt_iou =  eval_tt_iou_val_df.T.mean().mean()
+        avg_tt_iou = eval_tt_iou_val_df.T.mean().mean()
         avg_inf_dice = eval_inf_dice_val_df.T.mean().mean()
-        avg_inf_iou =  eval_inf_iou_val_df.T.mean().mean()
-        avg_inf_sensitivity =  eval_inf_sensitivity_val_df.T.mean().mean()
-        avg_inf_specificity =  eval_inf_specificity_val_df.T.mean().mean()
+        avg_inf_iou = eval_inf_iou_val_df.T.mean().mean()
+        # [✅ 修正：加入 avg_inf_sensitivity 的計算]
+        avg_inf_sensitivity = eval_inf_sensitivity_val_df.T.mean().mean()
+        # [✅ 修正：調整 avg_inf_specificity 的位置]
+        avg_inf_specificity = eval_inf_specificity_val_df.T.mean().mean()
         avg_inf_time = eval_inf_time_df.T.mean().mean()
-
+        
         eval_df = pd.concat([
             pid_df, eval_tt_dice_val_df, eval_tt_iou_val_df,
             eval_inf_dice_val_df, eval_inf_iou_val_df,
@@ -343,6 +377,7 @@ def main_worker(args):
         ], axis=1, join='inner').reset_index(drop=True)
         
         if args.save_eval_csv:
+            # Save CSV to the specific evaluation directory of the best trial
             eval_df.to_csv(os.path.join(args.eval_dir, f'best_model.csv'), index=False)
         
         print("\neval result:")
@@ -356,12 +391,13 @@ def main_worker(args):
         
         print(eval_df.to_string())
         
+        # Report final test metrics to Ray Tune (only in test mode)
         tune.report(
             tt_dice=avg_tt_dice,
             tt_iou=avg_tt_iou,
             inf_dice=avg_inf_dice,
             inf_iou=avg_inf_iou,
-            val_bst_acc=best_acc,
+            val_bst_acc=best_acc, # best_acc loaded from checkpoint
             inf_time=avg_inf_time
         )
 
@@ -375,9 +411,9 @@ if __name__ == "__main__":
     elif args.tune_mode == 'train':
         search_space = {
             "exp": tune.grid_search([
-              {
-                  'exp': args.exp_name,
-              }
+                {
+                    'exp': args.exp_name,
+                }
             ])
         }
     elif args.tune_mode == 'network':
@@ -456,7 +492,10 @@ if __name__ == "__main__":
     else:
         raise ValueError(f"Invalid args tune mode:{args.tune_mode}")
 
+    # Set up the trainable function with required resources
     trainable_with_cpu_gpu = tune.with_resources(partial(main, args=args), {"cpu": 1, "gpu": 1})
+    
+    # Set up the CLI reporter to track relevant metrics
     reporter = CLIReporter(metric_columns=[
         'tt_dice',
         'tt_iou',
@@ -470,34 +509,72 @@ if __name__ == "__main__":
 
     if args.resume_tuner:
         print(f'resume tuner form {args.root_exp_dir}')
-        restored_tuner = tune.Tuner.restore(os.path.join(args.root_exp_dir, args.exp_name), trainable=trainable_with_cpu_gpu)
+        restored_tuner = tune.Tuner.restore(
+            os.path.join(args.root_exp_dir, args.exp_name), 
+            trainable=trainable_with_cpu_gpu,
+            # Pass the RunConfig to ensure paths are correct during restoration
+            restart_errored=False, # Prevent restart of finished trials
+        )
         
         # for manual test
         if args.tune_mode == 'test':
             print('run test mode ...')
-            # get best model path
+            
+            # get best result object
             result_grid = restored_tuner.get_results()
-            best_result = result_grid.get_best_result(metric="inf_dice", mode="max")
-            model_pth = os.path.join( best_result.log_dir, 'models', 'best_model.pth')
-            # test
-            # for LinearWarmupCosineAnnealingLR
+            # If metrics are reported during training (val_bst_acc), use that, 
+            # otherwise rely on final test metrics (inf_dice)
+            # Assuming 'inf_dice' is the final metric reported by the trial's final test phase.
+            best_result = result_grid.get_best_result(metric="inf_dice", mode="max") 
+            
+            if best_result is None:
+                print("Error: Could not find any successful trial results to determine the best model.")
+                sys.exit(1)
+
+            # --- START FIX: Load best trial config into args for correct inference parameters ---
+            best_config = best_result.config
+            
+            # Replicate the config mapping logic from the 'main' function to ensure 
+            # inference parameters (ROI, spacing, intensity) match the trained model.
+            if args.tune_mode == 'transform':
+                args = map_args_transform(best_config, args)
+            elif args.tune_mode == 'optim':
+                args = map_args_optim(best_config['optim'], args)
+            elif args.tune_mode == 'lrschedule' or args.tune_mode == 'lrschedule_epoch':
+                # Note: The 'lrschedule' mode config has nested dicts for transform/optim/lrschedule
+                args = map_args_transform(best_config['transform'], args)
+                args = map_args_optim(best_config['optim'], args)
+                args = map_args_lrschedule(best_config['lrschedule'], args)
+            elif args.tune_mode == 'network':
+                args = map_args_network(best_config, args)
+                
+            # --- IMPORTANT: Set paths to the best trial's directory (FIXED: Ray Tune uses '.path' instead of '.log_dir') ---
+            # Set model_dir and eval_dir to the best trial's persistent directory (where checkpoints are saved)
+            # Original Error Line: args.model_dir = os.path.join(best_result.log_dir, 'models') 
+            args.model_dir = os.path.join(best_result.path, 'models') # <-- FIXED
+            args.eval_dir = os.path.join(best_result.path, 'evals') # <-- FIXED
+            
+            # Set the necessary paths and flags for main_worker
             args.max_epochs = args.max_epoch
             args.test_mode = True
-            args.checkpoint = os.path.join(model_pth)
-            args.eval_dir = os.path.join(best_result.log_dir, 'evals')
             
+            # The checkpoint must point to the best model from the best trial's directory
+            args.checkpoint = os.path.join(args.model_dir, 'best_model.pth')
+            
+            print(f"Final testing best model from: {args.checkpoint}")
             main_worker(args)
         else:
+            # Continue the tuning process
             result = restored_tuner.fit()
     else:
+        # Start a new tuning session
         tuner = tune.Tuner(
             trainable_with_cpu_gpu,
             param_space=search_space,
             run_config=air.RunConfig(
                 name=args.exp_name,
-                local_dir=args.root_exp_dir,
+                storage_path=args.root_exp_dir,
                 progress_reporter=reporter
             )
         )
         tuner.fit()
-    
