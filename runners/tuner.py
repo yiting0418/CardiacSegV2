@@ -136,7 +136,7 @@ def run_training(
         )
 
         if (
-                epoch % args.val_every == 0 and epoch != 0
+            epoch % args.val_every == 0 and epoch != 0
         ) or epoch == args.max_epoch:
             epoch_iterator_val = tqdm(
                 val_loader, desc="Validate (X / X Steps) (dice=X.X)", dynamic_ncols=True
@@ -230,22 +230,18 @@ def run_training(
                         )
                     )
 
-            # Send the current training result back to Tune
-            tune.report(
-                tt_dice=0,
-                tt_iou=0,
-                val_bst_acc=val_acc_best,
-                esc=early_stop_count,
-            )
-            
-           
-            # metrics = {
-            #     'tt_dice':0,
-            #     'tt_iou':0,
-            #     'val_bst_acc':val_acc_best,
-            #     'esc':early_stop_count,
-            # }
-            # train.report(metrics)
+            # --- 唯一的修正點在這裡 ---
+            #
+            # 1. 修正 TypeError：必須使用「字典」{} 格式。
+            # 2. 修正 NameError：使用正確的變數名稱 'val_avg_acc' 和 'val_acc_best'。
+            #
+            metrics_to_report = {
+                "val_avg_dice": val_avg_acc,      # 當前 epoch 的平均 Dice
+                "val_best_dice": val_acc_best,    # 歷史最佳的 Dice
+                "early_stop_count": early_stop_count
+            }
+            tune.report(metrics_to_report)
+            # --- 修正結束 ---
             
 
         if scheduler is not None:
