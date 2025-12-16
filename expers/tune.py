@@ -1,20 +1,13 @@
 import sys
-# set package path
-sys.path.append("/content/CardiacSegV2")
-
 import os
-import gc  # (修正：引入垃圾回收)
+import gc  # 引入垃圾回收
 from functools import partial
-
 import numpy as np
-
 import pandas as pd
-
 import torch
 from torch.utils.tensorboard import SummaryWriter 
 import ray
 from ray import air, tune
-# (修正：引入 session)
 from ray.air import session
 from ray.tune import CLIReporter
 
@@ -30,20 +23,24 @@ from monai.transforms import (
 from monailabel.transform.post import Restored
 
 from networks.network import network
-
 from expers.args import get_parser, map_args_transform, map_args_optim, map_args_lrschedule, map_args_network
 from data_utils.dataset import DataLoader, get_label_names, get_infer_data
-# (修正：引入 load_data_dict_json，這是之前報錯的地方)
 from data_utils.data_loader_utils import load_data_dict_json
 from data_utils.utils import get_pids_by_loader, get_pids_by_data_dicts
 from runners.tuner import run_training
 from runners.tester import run_testing
 from runners.inferer import run_infering
-ray.init(runtime_env={
-    "working_dir": "/content/CardiacSegV2",
-    "excludes": ["/content/CardiacSegV2/.git/"]
-})
 from optimizers.optimizer import Optimizer, LR_Scheduler
+
+# --- 修改 1: 設定動態路徑 (自動抓取當前目錄) ---
+sys.path.append(os.getcwd())
+
+# --- 修改 2: Ray 初始化路徑修正 ---
+# 在本機執行時，working_dir 設為當前目錄即可
+ray.init(runtime_env={
+    "working_dir": os.getcwd(),
+    "excludes": [os.path.join(os.getcwd(), ".git")]
+})
 
 def main(config, args=None):
     if args.tune_mode == 'transform':
@@ -69,20 +66,30 @@ def main(config, args=None):
         print('max_epochs',args.max_epochs)
     
     
-    # train
+    # 1. Train (訓練階段)
     args.test_mode = False
     args.checkpoint = os.path.join(args.model_dir, 'final_model.pth')
     main_worker(args)
-    # test
+    
+    # --- 修改 3: 加入記憶體清理機制 (防止 OOM) ---
+    print("Training finished. Cleaning up memory for testing...")
+    # 強制回收 CPU 記憶體
+    gc.collect()
+    # 強制釋放 GPU 顯存
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache()
+    print("Memory cleaned. Starting testing phase...")
+    # ----------------------------------------
+
+    # 2. Test (測試階段)
     args.test_mode = True
     args.checkpoint = os.path.join(args.model_dir, 'best_model.pth')
     args.ssl_checkpoint = None
     main_worker(args)
     
 
-
 def main_worker(args):
-    # # make dir
+    # make dir
     os.makedirs(args.model_dir, exist_ok=True)
     os.makedirs(args.log_dir, exist_ok=True)
 
@@ -110,16 +117,6 @@ def main_worker(args):
     else:
         print('loss: dice ce loss')
         dice_loss = DiceCELoss(to_onehot_y=True, softmax=True)
-        # print('loss: dice loss')
-        # dice_loss = DiceLoss(to_onehot_y=True, softmax=True)
-        # print('loss: dice focal loss')
-        # dice_loss = DiceFocalLoss(
-        #     to_onehot_y=True, 
-        #     softmax=True,
-        #     gamma=2.0,
-        #     lambda_dice=args.lambda_dice,
-        #     lambda_focal=args.lambda_focal
-        # )
     
     # optimizer
     print(f'optimzer: {args.optim}')
@@ -316,7 +313,7 @@ def main_worker(args):
             
             inf_times.append(ret_dict['inf_time'])  
 
-            # (修正：強制回收記憶體)
+            # 強制回收記憶體
             gc.collect()
                     
         
@@ -393,7 +390,7 @@ def main_worker(args):
         
         print(eval_df.to_string())
         
-        # (修正：先檢查 session 是否存在)
+        # 檢查 session 是否存在
         if session.get_session():
             session.report({
                 "tt_dice": avg_tt_dice,
